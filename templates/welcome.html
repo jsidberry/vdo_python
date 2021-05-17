@@ -9,17 +9,20 @@
             .moviewrapper{ width: 90%; color: white; display: block; margin-top: 20px; margin-left: auto; margin-right: auto; }
         </style>
     </head>
-    <body background="images/listing_bg.jpg">
+    <body background="/static/images/home_top_banner.jpg">
         <div class="page-header">
+            <h1>Hi, <b><?php echo htmlspecialchars($_SESSION["username"]); ?></b>. Welcome to our site.</h1>
+            {% if not session.logged_in %}
+                <a href="{{ url_for('login') }}" class="btn btn-primary">Log In</a>
+            {% else %}
+                <a href="{{ url_for('logout') }}" class="btn btn-danger">Sign Out</a>
+            {% endif %}
             <p>
                 <a href="listing.php" class="btn btn-primary">Movie Listings</a>
-                <a href="logout.php" class="btn btn-danger">Sign Out</a>
+                <a href="listing.php" class="btn btn-primary">Forex Training</a>
+                <a href="reset-password.php" class="btn btn-warning">Reset Your Password</a>
+                <a href="logout.php" class="btn btn-danger">Sign Out of Your Account</a>
             </p>
-        </div>
-        <div class="moviewrapper">
-            <iframe src="<?php echo $signedUrl; ?>" width="100%" height="600">
-                <p>Your browser does not support the video tag.</p>
-            </iframe>
         </div>
     </body>
 </html>
