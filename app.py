@@ -2,6 +2,7 @@ import os
 import logging
 import boto3
 import datetime
+import pprint as pp
 from botocore.exceptions import ClientError
 import config
 import sqlite3
@@ -19,13 +20,21 @@ app.config.update(dict(
 ))
 
 app.config.from_envvar('FLASKR_SETTINGS', silent=True)
-s3_client = boto3.client('s3')
-vdo_objects = s3_client.list_objects_v2(
-    Bucket=config.s3_bucket_name,
-    EncodingType='url',
-)
-expiry = datetime.datetime.now() + 7200
-expires = datetime.datetime.today() + 86400
+
+# S3 configuration
+s3_client      = boto3.client('s3')
+s3_access_key  = os.environ['AWS_ACCESS_KEY_ID']
+s3_secret_key  = os.environ['AWS_SECRET_ACCESS_KEY']
+s3_bucket_name = 'dyx-us-east-2-kac124cloud'
+s3_prefix      = 'movies'
+s3_region      = 'us-east-2'
+
+# vdo_objects = s3_client.list_objects_v2(
+#     Bucket=s3_bucket_name,
+#     EncodingType='url',
+# )
+# expiry = datetime.datetime.now() + 7200
+# expires = datetime.datetime.today() + 86400
 
 # Route for handling the login page logic
 @app.route('/login', methods=['GET', 'POST'])
@@ -54,12 +63,14 @@ def welcome():
 @app.route('/')
 def listings():
     # get move list from S3
-    vdo_titles = config['s3_client'].list_objects_v2(
-        Bucket=config['s3_bucket_name'],
-        Prefix=config['s3_prefix'],
-        ContinuationToken='string'
+    vdo_titles = s3_client.list_objects_v2(
+        Bucket=s3_bucket_name,
+        Prefix=s3_prefix,
     )
-    return render_template('listings.html', vdo_titles=vdo_titles)
+    
+    for vdo_title in vdo_titles['Contents']:
+        print(vdo_title['Key'])
+    return render_template('listings.html', video_titles=vdo_titles['Contents'])
 
 
 @app.route('/logout')
