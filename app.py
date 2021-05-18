@@ -36,6 +36,41 @@ s3_region      = 'us-east-2'
 # expiry = datetime.datetime.now() + 7200
 # expires = datetime.datetime.today() + 86400
 
+def create_presigned_url(bucket_name, object_name, expiration=3600):
+    """Generate a presigned URL to share an S3 object
+
+    :param bucket_name: string
+    :param object_name: string
+    :param expiration: Time in seconds for the presigned URL to remain valid
+    :return: Presigned URL as string. If error, returns None.
+    """
+
+    # Generate a presigned URL for the S3 object
+    s3_client = boto3.client('s3')
+    try:
+        response = s3_client.generate_presigned_url('get_object',
+                                                    Params={'Bucket': bucket_name,
+                                                            'Key': object_name},
+                                                    ExpiresIn=expiration)
+    except ClientError as e:
+        logging.error(e)
+        return None
+
+    # The response contains the presigned URL
+    return response
+
+def s3_titles():
+    signed_titles = dict()
+    vdo_titles = s3_client.list_objects_v2(
+        Bucket=s3_bucket_name,
+        Prefix=s3_prefix,
+    )
+    for vdo_title in vdo_titles['Contents']:
+        movie_title = vdo_title['Key'][7:]
+        signed_url = create_presigned_url(s3_bucket_name, vdo_title['Key'], expiration=7200)
+        signed_titles[movie_title] = signed_url
+    return signed_titles
+
 # Route for handling the login page logic
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -62,15 +97,8 @@ def welcome():
 
 @app.route('/')
 def listings():
-    # get move list from S3
-    vdo_titles = s3_client.list_objects_v2(
-        Bucket=s3_bucket_name,
-        Prefix=s3_prefix,
-    )
-    
-    for vdo_title in vdo_titles['Contents']:
-        print(vdo_title['Key'])
-    return render_template('listings.html', video_titles=vdo_titles['Contents'])
+    vdo_titles_signed_url = s3_titles()
+    return render_template('listings.html', video_titles=vdo_titles_signed_url)
 
 
 @app.route('/logout')

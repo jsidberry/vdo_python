@@ -9,7 +9,7 @@
         a:visited { text-decoration: none; }
         a:hover { text-decoration: underline; }
         a:active { text-decoration: underline; }
-        a, body { color: white; } }
+        a, body { color: white; }
     </style>
   </head>
   <body background="/static/images/listing_bg.jpg">
@@ -19,31 +19,30 @@
         <a href="{{ url_for('logout') }}" class="btn btn-danger">Sign Out</a>
       </p>
     </div>
-    <div>
-        <ul>
-            {% for video_title in video_titles %}
-            <li>{{ video_title['Key'] }}</li>
+    <!-- <div>
+        <div>
+            {% for key in video_titles %}
+            <a href="{{ video_titles[key] }}" target="_blank">{{ key }}</a>
             {% endfor %}
-        </ul>
-    </div>
-    <!-- <table>
+        </div>
+    </div> -->
+    <table>
       <thead>
         <tr>
           <th>Movie List</th>
         </tr>
       </thead>
       <tbody>
-          
+        {% for key in video_titles %}
         <tr style="color: white;">
           <td>
-            <a href="<?php echo $movieUrl; ?>" target="_blank"><?php if ($movieTitle !== '.'){echo $movieTitle;} ?></a>
-            <a href="video.php?title=<?php echo $movieTitle; ?>"><?php if ($movieTitle !== '.'){echo $movieTitle;} ?></a>
-            < <a href="<?php echo $movieUrl; ?>" target="_blank"><?php if ($movieTitle !== '.'){echo $movieTitle;} ?></a>
+            
+            <a href="{{ video_titles[key] }}" target="_blank">{{ key }}</a>
+            
           </td>
         </tr>
-        <?php } ?>
-        <?php endforeach; ?>
       </tbody>
-    </table> --> 
+      {% endfor %}
+    </table> 
   </body>
 </html>
