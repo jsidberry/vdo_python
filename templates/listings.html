@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Listing</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.css">
+    <style type="text/css">
+        a:link { text-decoration: none; }
+        a:visited { text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        a:active { text-decoration: underline; }
+        a, body { color: white; } }
+    </style>
+  </head>
+  <body background="/static/images/listing_bg.jpg">
+    <div class="page-header">
+      <p>
+        <a href="{{ url_for('listings') }}" class="btn btn-primary">Movie Listings</a>
+        <a href="{{ url_for('logout') }}" class="btn btn-danger">Sign Out</a>
+      </p>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Movie List</th>
+        </tr>
+      </thead>
+      <tbody>
+        {%for video_title in video_titles%}
+        <?php $target_url = $config['cloudfront']['url'] . "/" . $object['Key']; ?>
+        <?php if ((strstr($object['Key'],"/",true)) == "movies") {$signedUrl = $cloudFront->getSignedUrl(['url' => $target_url, 'expires' => $expires, 'private_key' => $config['cloudfront']['private_key'], 'key_pair_id' => $config['cloudfront']['key_pair_id']]); ?>
+        <?php $movieTitle = ltrim($object['Key'],"movies/"); ?>
+        <?php $movieUrl = $signedUrl; ?>
+        <tr style="color: white;">
+          <td>
+            <!--a href="<?php echo $movieUrl; ?>" target="_blank"><?php if ($movieTitle !== '.'){echo $movieTitle;} ?></a-->
+            <!--a href="video.php?title=<?php echo $movieTitle; ?>"><?php if ($movieTitle !== '.'){echo $movieTitle;} ?></a-->
+            <a href="<?php echo $movieUrl; ?>" target="_blank"><?php if ($movieTitle !== '.'){echo $movieTitle;} ?></a>
+          </td>
+        </tr>
+        <?php } ?>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </body>
+</html>
