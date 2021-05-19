@@ -1,12 +1,19 @@
 import os
 import logging
 import boto3
-import datetime
+from datetime import datetime  
+from datetime import timedelta
 import pprint as pp
-from botocore.exceptions import ClientError
 import config
 import sqlite3
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+from botocore.signers import CloudFrontSigner
+from botocore.exceptions import ClientError
 from flask import Flask, render_template, redirect, url_for, request, session, g, abort, flash
+
 
 app = Flask(__name__)
 app.config.from_object(__name__)
@@ -23,51 +30,55 @@ app.config.from_envvar('FLASKR_SETTINGS', silent=True)
 
 # S3 configuration
 s3_client      = boto3.client('s3')
+s3_resource    = boto3.resource('s3')
 s3_access_key  = os.environ['AWS_ACCESS_KEY_ID']
 s3_secret_key  = os.environ['AWS_SECRET_ACCESS_KEY']
 s3_bucket_name = 'dyx-us-east-2-kac124cloud'
 s3_prefix      = 'movies'
 s3_region      = 'us-east-2'
+# s3_resource.Bucket(s3_bucket_name).download_file(config.cf_key_pair_id, config.cf_private_key_location)
 
-# vdo_objects = s3_client.list_objects_v2(
-#     Bucket=s3_bucket_name,
-#     EncodingType='url',
-# )
-# expiry = datetime.datetime.now() + 7200
-# expires = datetime.datetime.today() + 86400
 
-def create_presigned_url(bucket_name, object_name, expiration=3600):
-    """Generate a presigned URL to share an S3 object
+def rsa_signer(message):
+    with open(config.cf_private_key, 'rb') as key_file:
+        private_key = serialization.load_pem_private_key(
+            key_file.read(),
+            password=None,
+            backend=default_backend()
+        )
+    return private_key.sign(message, padding.PKCS1v15(), hashes.SHA1())
 
-    :param bucket_name: string
-    :param object_name: string
-    :param expiration: Time in seconds for the presigned URL to remain valid
-    :return: Presigned URL as string. If error, returns None.
-    """
-
-    # Generate a presigned URL for the S3 object
-    s3_client = boto3.client('s3')
-    try:
-        response = s3_client.generate_presigned_url('get_object',
-                                                    Params={'Bucket': bucket_name,
-                                                            'Key': object_name},
-                                                    ExpiresIn=expiration)
-    except ClientError as e:
-        logging.error(e)
-        return None
-
-    # The response contains the presigned URL
-    return response
 
 def s3_titles():
+    # { "title.mp4" : "s3://dyx-us-east-2-kac124cloud/movies/title.mp4" }
+    # { "key" : "s3://bucket_name/prefix/key" }
     signed_titles = dict()
+
     vdo_titles = s3_client.list_objects_v2(
         Bucket=s3_bucket_name,
         Prefix=s3_prefix,
     )
+
+    expiration_date = 3600
+    now = datetime.now()
+    year = int(now.strftime("%Y"))
+    month = int(now.strftime("%m"))
+    day = int(now.strftime("%d"))
+    expire_date = datetime(year, month, day)
+    key_id = config.cf_key_pair_id
+    cloudfront_signer = CloudFrontSigner(key_id, rsa_signer)
+
     for vdo_title in vdo_titles['Contents']:
         movie_title = vdo_title['Key'][7:]
-        signed_url = create_presigned_url(s3_bucket_name, vdo_title['Key'], expiration=7200)
+        try:
+            url = f"{config.cf_url}{vdo_title}"
+            # Create a signed url that will be valid until the specfic expiry date
+            # provided using a canned policy.
+            signed_url = cloudfront_signer.generate_presigned_url(
+                url, date_less_than=expire_date)
+        except ClientError as e:
+            logging.error(e)
+        # signed_url = create_presigned_url(s3_bucket_name, vdo_title['Key'], expiration_date)
         signed_titles[movie_title] = signed_url
     return signed_titles
 
@@ -98,7 +109,8 @@ def welcome():
 @app.route('/')
 def listings():
     vdo_titles_signed_url = s3_titles()
-    return render_template('listings.html', video_titles=vdo_titles_signed_url)
+    return render_template('listings.html', 
+                            video_titles=vdo_titles_signed_url)
 
 
 @app.route('/logout')
