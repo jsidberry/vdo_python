@@ -4,7 +4,7 @@ import boto3
 from datetime import datetime  
 from datetime import timedelta
 import pprint as pp
-import config
+# import config
 import sqlite3
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
@@ -19,14 +19,20 @@ app = Flask(__name__)
 app.config.from_object(__name__)
 
 
-app.config.update(dict(
-    DATABASE=os.path.join(app.root_path, 'flaskr.db'),
-    SECRET_KEY='development key',
-    USERNAME='vdoflix',
-    PASSWORD='im2bz2bnvdo'
-))
-
-app.config.from_envvar('FLASKR_SETTINGS', silent=True)
+def list_of_files():
+    remote_obj_bucket = s3_resource.Bucket(remote_bucket_name)
+    summaries = remote_obj_bucket.objects.all()
+    files = []
+    config_prefix = "projects/vdo_python"
+    for file in summaries:
+        if file.key.startswith(config_prefix):
+            files.append(file.key)
+            s3_client.download_file(
+                remote_bucket_name,
+                file.key,
+                os.path.basename(file.key)
+            )
+    return files
 
 # S3 configuration
 s3_client      = boto3.client('s3')
@@ -36,7 +42,18 @@ s3_secret_key  = os.environ['AWS_SECRET_ACCESS_KEY']
 s3_bucket_name = 'dyx-us-east-2-kac124cloud'
 s3_prefix      = 'movies'
 s3_region      = 'us-east-2'
-# s3_resource.Bucket(s3_bucket_name).download_file(config.cf_key_pair_id, config.cf_private_key_location)
+remote_bucket_name = 'configs-vars-secrets-309213020321'
+remote_objects = list_of_files()
+
+import config
+app.config.update(dict(
+    DATABASE=os.path.join(app.root_path, 'flaskr.db'),
+    SECRET_KEY='development key',
+    USERNAME='vdoflix',
+    PASSWORD='im2bz2bnvdo'
+))
+
+app.config.from_envvar('FLASKR_SETTINGS', silent=True)
 
 
 def rsa_signer(message):
@@ -50,35 +67,32 @@ def rsa_signer(message):
 
 
 def s3_titles():
-    # { "title.mp4" : "s3://dyx-us-east-2-kac124cloud/movies/title.mp4" }
-    # { "key" : "s3://bucket_name/prefix/key" }
     signed_titles = dict()
 
     vdo_titles = s3_client.list_objects_v2(
         Bucket=s3_bucket_name,
         Prefix=s3_prefix,
     )
-
-    expiration_date = 3600
-    now = datetime.now()
-    year = int(now.strftime("%Y"))
-    month = int(now.strftime("%m"))
-    day = int(now.strftime("%d"))
-    expire_date = datetime(year, month, day)
-    key_id = config.cf_key_pair_id
-    cloudfront_signer = CloudFrontSigner(key_id, rsa_signer)
+    print("get list of movies from S3...")
+    
+    key_id            = config.cf_key_pair_id
+    now               = datetime.now() + timedelta(days=1)
+    year              = int(now.strftime("%Y"))
+    month             = int(now.strftime("%m"))
+    day               = int(now.strftime("%d"))
+    expire_date       = datetime(year, month, day)
+    key_id            = config.cf_key_pair_id
 
     for vdo_title in vdo_titles['Contents']:
         movie_title = vdo_title['Key'][7:]
         try:
-            url = f"{config.cf_url}{vdo_title}"
-            # Create a signed url that will be valid until the specfic expiry date
-            # provided using a canned policy.
+            key_id = config.cf_key_pair_id
+            url = f"{config.cf_url}/movies/{movie_title}"
+            cloudfront_signer = CloudFrontSigner(key_id, rsa_signer)
             signed_url = cloudfront_signer.generate_presigned_url(
                 url, date_less_than=expire_date)
         except ClientError as e:
             logging.error(e)
-        # signed_url = create_presigned_url(s3_bucket_name, vdo_title['Key'], expiration_date)
         signed_titles[movie_title] = signed_url
     return signed_titles
 
@@ -119,4 +133,4 @@ def logout():
     flash('You were logged out')
     return redirect(url_for('login'))
 
-print(app.config)
+# print(app.config)
